@@ -7,10 +7,8 @@ class $modify(LoadingLayer) {
     void loadAssets() {
         LoadingLayer::loadAssets();
         
-        // En Geode v5, usamos static_cast para tipos definidos
-        auto texQuality = GameManager::sharedState()->m_texQuality;
-        auto quality = static_cast<TextureQuality>(static_cast<int>(texQuality));
-        
+        // Reemplazado 'as' por static_cast para compatibilidad con v5
+        auto quality = static_cast<TextureQuality>(GameManager::sharedState()->m_texQuality);
         CCDirector::get()->updateContentScale(quality);
     }
 };
