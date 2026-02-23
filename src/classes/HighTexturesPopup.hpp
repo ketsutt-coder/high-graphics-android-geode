@@ -4,22 +4,18 @@
 #include <Geode/utils/web.hpp>
 using namespace geode::prelude;
 namespace fs = std::filesystem;
-using ExtractTask = Task<Result<>, float>;
 
-class HighTexturesPopup : public geode::Popup<bool> {
+// 1. Popup ya no usa plantillas en Geode v5
+class HighTexturesPopup : public geode::Popup {
 protected:
-    bool setup(bool zipExists) override;
+    // 2. setup() fue reemplazado por init()
+    bool init(bool zipExists);
 
 public:
-    // inline static matjson::Value m_links = matjson::makeObject({
-    //     {"2.2074", "https://files.catbox.moe/buykym.zip"}
-    //     // {"2.2074", "http://localhost:8000/2.2074.zip"}
-    // });
-
     inline static std::map<std::string, std::vector<std::string>> m_links = {
-        // changed catbox link!! (removed geode textures lol)
-        {"2.2074", {"https://github.com/Weebifying/gd-textures/releases/download/2.2074/2.2074.zip", "https://files.catbox.moe/buykym.zip", "https://archive.org/download/2.2074/2.2074.zip"}}
-        // {"2.2074", {"http://localhost:8000/2.2074.zip", "https://archive.org/download/2.2074/2.2074.zip"}}
+        // Agregué 2.2081 para que coincida con la nueva versión y evite crashear el juego
+        {"2.2074", {"https://github.com/Weebifying/gd-textures/releases/download/2.2074/2.2074.zip", "https://files.catbox.moe/buykym.zip", "https://archive.org/download/2.2074/2.2074.zip"}},
+        {"2.2081", {"https://github.com/Weebifying/gd-textures/releases/download/2.2074/2.2074.zip", "https://files.catbox.moe/buykym.zip", "https://archive.org/download/2.2074/2.2074.zip"}}
     };
 
     float m_downloadPercentage = 0.f;
@@ -43,8 +39,8 @@ public:
     CCMenuItemSpriteExtra* m_downloadBtn;
     CCMenuItemSpriteExtra* m_extractBtn;
 
+    // Mantenemos el listener de descargas por ahora
     EventListener<web::WebTask> m_downloadListener;
-    EventListener<ExtractTask> m_extractListener;
 
     static HighTexturesPopup* create(bool zipExists);
     CCMenuItemSpriteExtra* createButton(const char* text, float width, const char* sprite, std::string id, SEL_MenuHandler selector);
@@ -56,14 +52,10 @@ public:
     void onRestart(CCObject* sender);
     void onHide(CCObject* sender);
 
-    ExtractTask getExtractTask(fs::path file, fs::path path);
-
     void setDownloadPercentage(float percentage, ccColor3B color);
     void setExtractPercentage(float percentage, ccColor3B color);
 
-
     void startDownload();
-    // void startDownloadBackup();
     void startExtract(fs::path file, fs::path path);
 
     void downloadSucceeded(fs::path file, fs::path path);
