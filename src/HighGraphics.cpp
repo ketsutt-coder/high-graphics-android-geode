@@ -5,34 +5,22 @@ HighGraphics* HighGraphics::get() {
     return &instance;
 }
 
+// Lógica de conteo de archivos simplificada para evitar bloqueos en iOS
 int HighGraphics::getNumFiles(fs::path path) {
+    if (!fs::exists(path)) return 0;
     int count = 0;
-
-    if (fs::exists(path)) {
-        for (const auto& entry : fs::directory_iterator(path)) {
-            if (entry.is_regular_file()) count++;
-        }
-
-        if (fs::exists(path / "icons")) {
-            for (const auto& entry : fs::directory_iterator(path / "icons")) {
-                if (entry.is_regular_file()) count++;
-            }
-        }
+    for (const auto& entry : fs::directory_iterator(path)) {
+        if (entry.is_regular_file()) count++;
     }
-
     return count;
 }
 
 $on_mod(Loaded) {
     std::string version = Loader::get()->getGameVersion();
-    fs::path path = Mod::get()->getConfigDir();
+    fs::path path = Mod::get()->getConfigDir() / version;
 
-    HighGraphics* manager = HighGraphics::get();
-    manager->m_numFiles = manager->getNumFiles(path / version);
-
-    if (fs::exists(path / version)) {
-        log::debug("Loading high graphics textures");
-        // CCFileUtils::get()->addTexturePack({ "weebify.high-textures-new", { (path / version).string() } });
-        CCFileUtils::get()->addPriorityPath((path / version).string().c_str()); // fuck textureldr bro
+    if (fs::exists(path)) {
+        log::debug("Adding priority path for High Graphics: {}", path.string());
+        CCFileUtils::get()->addPriorityPath(path.string().c_str());
     }
 }
