@@ -17,8 +17,7 @@ HighTexturesPopup* HighTexturesPopup::create(bool zipExists) {
 void HighTexturesPopup::keyDown(cocos2d::enumKeyCodes key, double p1) {
     if (key == cocos2d::enumKeyCodes::KEY_Escape) return;
     if (m_finished && key == cocos2d::enumKeyCodes::KEY_Space) {
-        Mod::get()->setSavedValue("applied", false);
-        game::restart(true); // Argumento obligatorio en v5
+        game::restart(true); // El argumento true es obligatorio ahora
         return;
     }
     Popup::keyDown(key, p1);
@@ -29,44 +28,35 @@ bool HighTexturesPopup::setup(bool zipExists) {
     auto size = m_mainLayer->getContentSize();
     m_gameVersion = Loader::get()->getGameVersion();
 
-    m_chatLabel = CCLabelBMFont::create("Textures missing. Download now?", "chatFont.fnt");
+    m_chatLabel = CCLabelBMFont::create("Textures missing. Download?", "chatFont.fnt");
     m_chatLabel->setPosition({ size.width/2, size.height - 70 });
     m_mainLayer->addChild(m_chatLabel);
 
-    m_menu = CCMenu::create();
-    m_menu->setPosition({0, 0});
-    m_mainLayer->addChild(m_menu);
+    m_buttonsMenu = CCMenu::create();
+    m_buttonsMenu->setPosition({0, 0});
+    m_mainLayer->addChild(m_buttonsMenu);
 
     m_downloadBtn = createButton("Download", 100, "GJ_button_01.png", "download-btn", menu_selector(HighTexturesPopup::onDownload));
     m_restartBtn = createButton("Restart", 100, "GJ_button_02.png", "restart-btn", menu_selector(HighTexturesPopup::onRestart));
-    m_extractBtn = createButton("Extract", 100, "GJ_button_01.png", "extract-btn", menu_selector(HighTexturesPopup::onExtract));
-    m_retryBtn = createButton("Retry", 100, "GJ_button_04.png", "retry-btn", menu_selector(HighTexturesPopup::onRetry));
-
-    m_downloadBtn->setVisible(!zipExists);
-    m_extractBtn->setVisible(zipExists);
     
+    m_downloadBtn->setVisible(!zipExists);
+    m_restartBtn->setVisible(false);
     return true;
 }
-
-void HighTexturesPopup::onDownload(CCObject* sender) { startDownload(); }
-void HighTexturesPopup::onExtract(CCObject* sender) { 
-    fs::path path = Mod::get()->getConfigDir();
-    startExtract(path / (m_gameVersion + ".zip"), path); 
-}
-void HighTexturesPopup::onRetry(CCObject* sender) { onDownload(nullptr); }
-void HighTexturesPopup::onRestart(CCObject* sender) { game::restart(true); }
 
 void HighTexturesPopup::startDownload() {
     fs::path path = Mod::get()->getConfigDir();
     m_downloadListener.bind([=, this](web::WebTask::Event* e) {
         if (auto res = e->getValue()) {
             if (res->ok()) {
-                downloadSucceeded(path / (m_gameVersion + ".zip"), path);
+                fs::path file = path / (m_gameVersion + ".zip");
+                res->into(file);
+                startExtract(file, path);
             }
         }
     });
     auto req = web::WebRequest();
-    m_downloadListener.setFilter(req.get(m_links[m_gameVersion][0]));
+    m_downloadListener.setFilter(req.get(m_links["2.2081"][0]));
 }
 
 void HighTexturesPopup::startExtract(fs::path file, fs::path path) {
@@ -81,13 +71,13 @@ void HighTexturesPopup::startExtract(fs::path file, fs::path path) {
     }).detach();
 }
 
-void HighTexturesPopup::downloadSucceeded(fs::path file, fs::path path) { startExtract(file, path); }
-void HighTexturesPopup::downloadFailed(std::string reason) { log::error("{}", reason); }
+void HighTexturesPopup::onDownload(CCObject* sender) { startDownload(); }
+void HighTexturesPopup::onRestart(CCObject* sender) { game::restart(true); }
 
 CCMenuItemSpriteExtra* HighTexturesPopup::createButton(const char* text, float width, const char* sprite, std::string id, SEL_MenuHandler selector) {
     auto spr = ButtonSprite::create(text, width, true, "bigFont.fnt", sprite, 30, 0.6f);
     auto btn = CCMenuItemSpriteExtra::create(spr, this, selector);
-    btn->setPosition({ m_mainLayer->getContentSize().width / 2, 30 });
-    m_menu->addChild(btn);
+    btn->setPosition({ m_mainLayer->getContentSize().width / 2, 40 });
+    m_buttonsMenu->addChild(btn);
     return btn;
 }
