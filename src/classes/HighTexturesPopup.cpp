@@ -6,6 +6,7 @@ using namespace geode::utils::file;
 
 HighTexturesPopup* HighTexturesPopup::create(bool zipExists) {
     auto ret = new HighTexturesPopup();
+    // initAnchored es el método recomendado en la v5 para Popups
     if (ret && ret->initAnchored(360.f, 200.f, zipExists)) {
         ret->autorelease();
         return ret;
@@ -17,7 +18,8 @@ HighTexturesPopup* HighTexturesPopup::create(bool zipExists) {
 void HighTexturesPopup::keyDown(cocos2d::enumKeyCodes key, double p1) {
     if (key == cocos2d::enumKeyCodes::KEY_Escape) return;
     if (m_finished && key == cocos2d::enumKeyCodes::KEY_Space) {
-        game::restart(true); // El argumento true es obligatorio ahora
+        Mod::get()->setSavedValue("applied", false);
+        game::restart(true); // Argumento bool obligatorio en v5
         return;
     }
     Popup::keyDown(key, p1);
@@ -28,7 +30,7 @@ bool HighTexturesPopup::setup(bool zipExists) {
     auto size = m_mainLayer->getContentSize();
     m_gameVersion = Loader::get()->getGameVersion();
 
-    m_chatLabel = CCLabelBMFont::create("Textures missing. Download?", "chatFont.fnt");
+    m_chatLabel = CCLabelBMFont::create("Textures missing. Download now?", "chatFont.fnt");
     m_chatLabel->setPosition({ size.width/2, size.height - 70 });
     m_mainLayer->addChild(m_chatLabel);
 
@@ -41,6 +43,7 @@ bool HighTexturesPopup::setup(bool zipExists) {
     
     m_downloadBtn->setVisible(!zipExists);
     m_restartBtn->setVisible(false);
+    
     return true;
 }
 
@@ -66,6 +69,7 @@ void HighTexturesPopup::startExtract(fs::path file, fs::path path) {
             if (res.isOk()) {
                 m_finished = true;
                 m_restartBtn->setVisible(true);
+                m_chatLabel->setString("Success! Restart the game.");
             }
         });
     }).detach();
@@ -77,6 +81,7 @@ void HighTexturesPopup::onRestart(CCObject* sender) { game::restart(true); }
 CCMenuItemSpriteExtra* HighTexturesPopup::createButton(const char* text, float width, const char* sprite, std::string id, SEL_MenuHandler selector) {
     auto spr = ButtonSprite::create(text, width, true, "bigFont.fnt", sprite, 30, 0.6f);
     auto btn = CCMenuItemSpriteExtra::create(spr, this, selector);
+    btn->setID(id);
     btn->setPosition({ m_mainLayer->getContentSize().width / 2, 40 });
     m_buttonsMenu->addChild(btn);
     return btn;
