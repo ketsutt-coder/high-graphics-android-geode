@@ -2,18 +2,16 @@
 
 #include <Geode/Geode.hpp>
 #include <Geode/utils/web.hpp>
+
 using namespace geode::prelude;
 namespace fs = std::filesystem;
 
-// 1. Popup ya no usa plantillas en Geode v5
-class HighTexturesPopup : public geode::Popup {
+class HighTexturesPopup : public geode::Popup<bool> {
 protected:
-    // 2. setup() fue reemplazado por init()
-    bool init(bool zipExists);
+    bool setup(bool zipExists) override;
 
 public:
     inline static std::map<std::string, std::vector<std::string>> m_links = {
-        // Agregué 2.2081 para que coincida con la nueva versión y evite crashear el juego
         {"2.2074", {"https://github.com/Weebifying/gd-textures/releases/download/2.2074/2.2074.zip", "https://files.catbox.moe/buykym.zip", "https://archive.org/download/2.2074/2.2074.zip"}},
         {"2.2081", {"https://github.com/Weebifying/gd-textures/releases/download/2.2074/2.2074.zip", "https://files.catbox.moe/buykym.zip", "https://archive.org/download/2.2074/2.2074.zip"}}
     };
@@ -39,12 +37,14 @@ public:
     CCMenuItemSpriteExtra* m_downloadBtn;
     CCMenuItemSpriteExtra* m_extractBtn;
 
-    // Mantenemos el listener de descargas por ahora
-    EventListener<web::WebTask> m_downloadListener;
+    // Cambiado a WebResponseTask para Geode v5
+    EventListener<web::WebResponseTask> m_downloadListener;
 
     static HighTexturesPopup* create(bool zipExists);
     CCMenuItemSpriteExtra* createButton(const char* text, float width, const char* sprite, std::string id, SEL_MenuHandler selector);
-    void keyDown(cocos2d::enumKeyCodes key) override;
+    
+    // Corregido: Ahora recibe el double p1 que pide Geode v5
+    void keyDown(cocos2d::enumKeyCodes key, double p1) override;
 
     void onDownload(CCObject* sender);
     void onExtract(CCObject* sender);
