@@ -1,5 +1,7 @@
 #include "HighTexturesPopup.hpp"
 #include "../HighGraphics.hpp"
+#include <thread> // Para usar std::thread
+
 using namespace geode::utils::file;
 
 CCMenuItemSpriteExtra* HighTexturesPopup::createButton(const char* text, float width, const char* sprite, std::string id, SEL_MenuHandler selector) {
@@ -29,11 +31,19 @@ void HighTexturesPopup::keyDown(cocos2d::enumKeyCodes key) {
     Popup::keyDown(key);
 }
 
-bool HighTexturesPopup::setup(bool zipExists) {
+// 3. Modificado para Geode v5 (Popup::init)
+bool HighTexturesPopup::init(bool zipExists) {
+    if (!Popup::init(360.f, 200.f)) return false;
+
     this->setTitle("High Textures");
 
     CCSize size = m_mainLayer->getContentSize();
     m_gameVersion = Loader::get()->getGameVersion();
+    
+    // Fallback de seguridad por si es una sub-versión nueva
+    if (m_links.find(m_gameVersion) == m_links.end()) {
+        m_gameVersion = "2.2081"; 
+    }
 
     auto chatLabel = CCLabelBMFont::create("Looks like you have yet to download the high graphics textures necessary for this mod. Please download it now for the best experience. (File size: 107MB)", "chatFont.fnt");
     chatLabel->setPosition({ size.width/2, size.height - 70 });
@@ -148,12 +158,12 @@ bool HighTexturesPopup::setup(bool zipExists) {
 
 HighTexturesPopup* HighTexturesPopup::create(bool zipExists) {
     auto ret = new HighTexturesPopup();
-    if (ret && ret->initAnchored(360.f, 200.f, zipExists)) {
+    if (ret && ret->init(zipExists)) {
         ret->m_zipExists = zipExists;
         ret->autorelease();
         return ret;
     }
-    delete ret;
+    CC_SAFE_DELETE(ret);
     return nullptr;
 }
 
@@ -198,19 +208,6 @@ void HighTexturesPopup::setExtractPercentage(float percentage, ccColor3B color) 
     m_extractStencil->setScaleX(m_extractPercentage / 100);
     m_extractLabel->setString(fmt::format("{:.2f}%", m_extractPercentage).c_str());
     m_extractLabel->setColor(color);
-}
-
-ExtractTask HighTexturesPopup::getExtractTask(fs::path file, fs::path path) {
-    return ExtractTask::run([=] (auto progress, auto hasBeenCancelled) -> ExtractTask::Result {
-        auto res = file::Unzip::intoDir(
-            [=] (auto num, auto total) {
-                progress(num / (float)total * 100);
-            },
-            file, path, true
-        );
-
-        return res;
-    });
 }
 
 void HighTexturesPopup::startDownload() {
@@ -276,6 +273,7 @@ void HighTexturesPopup::startDownload() {
     m_downloadListener.setFilter(req.get(m_links[m_gameVersion][0]));
 }
 
+// 4. Extracción reescrita para usar un hilo seguro y evitar problemas con Geode Task
 void HighTexturesPopup::startExtract(fs::path file, fs::path path) {
     m_closeBtn->setVisible(false);
     m_progressBG->setVisible(true);
@@ -296,25 +294,35 @@ void HighTexturesPopup::startExtract(fs::path file, fs::path path) {
 
     setExtractPercentage(0.f, { 255, 255, 255 });
 
-    m_extractListener.bind([=] (ExtractTask::Event* e) {
-        if (auto result = e->getValue()) {
-            fs::path extractedPath = path / m_gameVersion;
-            if (fs::exists(extractedPath)) {
-                log::debug("Extracted high graphics textures to {}", extractedPath.string());
-                extractSucceeded();
-            } else {
-                log::debug("Failed to extract high graphics textures to {}", extractedPath.string());
-                extractFailed("Cannot find folder");
-            }
-        } else if (auto progress = e->getProgress()) {
-            setExtractPercentage(*progress, { 255, 255, 255 });
-        } else if (e->isCancelled()) {
-            log::debug("Extraction cancelled");
-            extractFailed("Extraction cancelled?");
-        }
-    });
+    // Hilo en segundo plano seguro
+    std::thread([this, file, path]() {
+        auto res = file::Unzip::intoDir(
+            [this](auto num, auto total) {
+                // Actualizar interfaz en el hilo principal
+                geode::Loader::get()->queueInMainThread([this, num, total]() {
+                    setExtractPercentage((num / (float)total) * 100.f, { 255, 255, 255 });
+                });
+            },
+            file, path, true
+        );
 
-    m_extractListener.setFilter(getExtractTask(file, path));
+        // Terminar proceso en el hilo principal
+        geode::Loader::get()->queueInMainThread([this, res, path]() {
+            if (res.isOk()) {
+                fs::path extractedPath = path / m_gameVersion;
+                if (fs::exists(extractedPath)) {
+                    log::debug("Extracted high graphics textures to {}", extractedPath.string());
+                    extractSucceeded();
+                } else {
+                    log::debug("Failed to extract high graphics textures to {}", extractedPath.string());
+                    extractFailed("Cannot find folder");
+                }
+            } else {
+                log::debug("Extraction failed internally");
+                extractFailed("Extraction failed");
+            }
+        });
+    }).detach();
 }
 
 void HighTexturesPopup::downloadSucceeded(fs::path file, fs::path path) {
